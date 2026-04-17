@@ -1,6 +1,6 @@
 /**
- * Feed Info Cards — Weather + Exchange Rate widgets
- * Displayed side-by-side above the feed tab bar
+ * SidebarWeatherWidget — Compact ambient sky weather card for RightSidebar
+ * Mirrors the FeedSkyHero data (weather, exchange rates, news) in sidebar form.
  */
 
 'use client';
@@ -27,7 +27,13 @@ interface ExchangeRate {
   rate: number;
 }
 
-/** Map Open-Meteo WMO weather codes → human label */
+interface NewsItem {
+  title: string;
+  source: string;
+}
+
+/* ── Weather code helpers ── */
+
 function interpretWeatherCode(code: number): string {
   if (code === 0) return 'Clear Sky';
   if (code <= 2) return 'Partly Cloudy';
@@ -42,7 +48,6 @@ function interpretWeatherCode(code: number): string {
   return 'Partly Cloudy';
 }
 
-/** Map WMO code → ambient weather condition for sky theme */
 function wmoToAmbient(code: number): AmbientWeather {
   if (code === 0 || code === 1) return 'clear';
   if (code === 2 || code === 3) return 'cloudy';
@@ -55,7 +60,6 @@ function wmoToAmbient(code: number): AmbientWeather {
   return 'clear';
 }
 
-/** Map OWM condition id → WMO-equivalent code */
 function owmIdToWmo(id: number): number {
   if (id >= 200 && id <= 232) return 95;
   if (id >= 300 && id <= 321) return 51;
@@ -76,14 +80,14 @@ function owmIdToCondition(id: number, description: string): string {
   return interpretWeatherCode(owmIdToWmo(id));
 }
 
-/* ── Mini Sky Scene Components (compact for small card) ── */
+/* ── Sky scene elements (compact for sidebar) ── */
 
-function MiniStars() {
+function SidebarStars() {
   const stars = useMemo(() =>
-    Array.from({ length: 12 }).map((_, i) => ({
+    Array.from({ length: 18 }).map((_, i) => ({
       id: i,
       w: 1 + (i * 7 + 3) % 2,
-      top: (i * 17 + 5) % 70,
+      top: (i * 17 + 5) % 75,
       left: (i * 23 + 11) % 95,
       opacity: 0.3 + ((i * 13) % 6) / 10,
       dur: 2 + ((i * 11) % 4),
@@ -109,8 +113,8 @@ function MiniStars() {
   );
 }
 
-function MiniCelestial({ theme }: { theme: SkyTheme }) {
-  const size = Math.round(theme.celestialSize * 0.5);
+function SidebarCelestial({ theme }: { theme: SkyTheme }) {
+  const size = Math.round(theme.celestialSize * 0.55);
 
   if (theme.isMoon) {
     return (
@@ -164,12 +168,42 @@ function MiniCelestial({ theme }: { theme: SkyTheme }) {
   );
 }
 
-function MiniRainDrops({ isDark }: { isDark: boolean }) {
+function SidebarCloud({ x, y, scale, color, speed }: { x: number; y: number; scale: number; color: string; speed: number }) {
+  return (
+    <div
+      className="absolute"
+      style={{
+        left: `${x}%`, top: `${y}%`, transform: `scale(${scale})`,
+        animation: `ambient-float ${speed}s ease-in-out infinite`,
+        animationDelay: `${speed * 0.3}s`,
+      }}
+    >
+      <div className="relative" style={{ width: 50, height: 20 }}>
+        <div className="absolute rounded-full" style={{ width: 20, height: 14, bottom: 0, left: 3, background: color, filter: 'blur(1px)' }} />
+        <div className="absolute rounded-full" style={{ width: 18, height: 18, bottom: 3, left: 12, background: color, filter: 'blur(1px)' }} />
+        <div className="absolute rounded-full" style={{ width: 24, height: 18, bottom: 1, left: 20, background: color, filter: 'blur(1px)' }} />
+        <div className="absolute rounded-full" style={{ width: 16, height: 12, bottom: 0, left: 34, background: color, filter: 'blur(1px)' }} />
+      </div>
+    </div>
+  );
+}
+
+function SidebarClouds({ color }: { color: string }) {
+  return (
+    <>
+      <SidebarCloud x={-5} y={12} scale={0.9} color={color} speed={14} />
+      <SidebarCloud x={55} y={6} scale={0.65} color={color} speed={18} />
+      <SidebarCloud x={25} y={25} scale={0.5} color={color} speed={10} />
+    </>
+  );
+}
+
+function SidebarRainDrops({ isDark }: { isDark: boolean }) {
   const drops = useMemo(() =>
-    Array.from({ length: 10 }).map((_, i) => ({
+    Array.from({ length: 14 }).map((_, i) => ({
       id: i,
       left: (i * 13 + 5) % 100,
-      height: 6 + (i * 7 + 3) % 10,
+      height: 8 + (i * 7 + 3) % 12,
       dur: 0.35 + ((i * 11) % 4) / 15,
       delay: ((i * 7) % 25) / 10,
       angle: -10 + ((i * 3) % 8),
@@ -182,7 +216,7 @@ function MiniRainDrops({ isDark }: { isDark: boolean }) {
           key={d.id}
           className="absolute"
           style={{
-            left: `${d.left}%`, top: '-8px',
+            left: `${d.left}%`, top: '-10px',
             width: '1px', height: `${d.height}px`,
             transform: `rotate(${d.angle}deg)`,
             background: isDark
@@ -198,13 +232,13 @@ function MiniRainDrops({ isDark }: { isDark: boolean }) {
   );
 }
 
-function MiniSilhouette({ color }: { color: string }) {
+function SidebarSilhouette({ color }: { color: string }) {
   return (
     <svg
       className="absolute bottom-0 left-0 w-full"
       viewBox="0 0 300 45"
       preserveAspectRatio="none"
-      style={{ height: '22px' }}
+      style={{ height: '24px' }}
     >
       <path
         d={`M0,45 L0,30 L8,30 L8,24 L12,24 L12,30 L18,30 L18,20 L22,20 L22,16 L26,16 L26,20 L30,20 L30,30 
@@ -234,14 +268,55 @@ function MiniSilhouette({ color }: { color: string }) {
   );
 }
 
-export function FeedInfoCards() {
+/* ── News helpers ── */
+
+const CORS_PROXIES = [
+  (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+];
+
+const NEWS_FEEDS = [
+  { url: 'https://punchng.com/feed/', source: 'PUNCH' },
+  { url: 'https://www.vanguardngr.com/feed/', source: 'VANGUARD' },
+  { url: 'https://www.channelstv.com/feed/', source: 'CHANNELS' },
+];
+
+const FALLBACK_NEWS: NewsItem[] = [
+  { title: 'Stay updated with the latest from your neighbourhood', source: 'NeyborHuud' },
+];
+
+async function fetchFeedWithFallback(feedUrl: string, source: string): Promise<NewsItem[]> {
+  for (const proxy of CORS_PROXIES) {
+    try {
+      const res = await fetch(proxy(feedUrl), { signal: AbortSignal.timeout(6000) });
+      if (!res.ok) continue;
+      const text = await res.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(text, 'text/xml');
+      const items = doc.querySelectorAll('item');
+      const result: NewsItem[] = [];
+      items.forEach((item) => {
+        const title = item.querySelector('title')?.textContent?.trim();
+        if (title) result.push({ title, source });
+      });
+      if (result.length > 0) return result.slice(0, 5);
+    } catch { /* try next proxy */ }
+  }
+  return [];
+}
+
+/* ── Main Widget ── */
+
+export default function SidebarWeatherWidget() {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [rates, setRates] = useState<ExchangeRate[]>([]);
   const [rateIndex, setRateIndex] = useState(0);
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [ratesLoading, setRatesLoading] = useState(true);
+  const [newsItems, setNewsItems] = useState<NewsItem[]>(FALLBACK_NEWS);
+  const [newsIndex, setNewsIndex] = useState(0);
 
-  // SSR-safe hour: stable default, update on client
+  // SSR-safe hour
   const [currentHour, setCurrentHour] = useState(12);
   useEffect(() => {
     setCurrentHour(new Date().getHours());
@@ -249,13 +324,12 @@ export function FeedInfoCards() {
     return () => clearInterval(interval);
   }, []);
 
-  // Ambient sky theme derived from hour + weather
   const timePeriod = getTimePeriod(currentHour);
   const ambientWeather = weather ? wmoToAmbient(weather.wmoCode) : 'clear';
   const theme = useMemo(() => getSkyTheme(timePeriod, ambientWeather), [timePeriod, ambientWeather]);
   const isDark = timePeriod === 'night' || timePeriod === 'evening';
 
-  // Fetch weather — watches location and updates automatically
+  // Fetch weather
   useEffect(() => {
     if (!navigator.geolocation) {
       setWeather({ temp: 32, condition: 'Sunny', city: 'Lagos', wmoCode: 0 });
@@ -273,7 +347,6 @@ export function FeedInfoCards() {
       lastLon = longitude;
 
       try {
-        // Reverse-geocode for city name
         let cityName = 'Your Area';
         try {
           const geoRes = await fetch(
@@ -286,9 +359,7 @@ export function FeedInfoCards() {
             cityName = a?.city_district || a?.town || a?.city || a?.suburb
               || a?.neighbourhood || a?.village || a?.county || a?.state || 'Your Area';
           }
-        } catch {
-          // geocode failed — cityName stays as default
-        }
+        } catch { /* geocode failed */ }
 
         // Strategy 1: Backend (OpenWeatherMap)
         const apiBase = API_BASE_URL;
@@ -308,8 +379,6 @@ export function FeedInfoCards() {
                 let wmoCode = owmIdToWmo(owmId);
                 let condition = owmIdToCondition(owmId, desc);
 
-                // Backend cross-references multiple weather models;
-                // trust isRaining/isShowering even if the OWM id looks benign
                 if (w.isRaining && wmoCode < 50) {
                   wmoCode = w.isShowering ? 80 : 61;
                   condition = w.isShowering ? 'Rain Showers' : 'Rain';
@@ -320,12 +389,10 @@ export function FeedInfoCards() {
                 return;
               }
             }
-          } catch {
-            // fall through to Open-Meteo
-          }
+          } catch { /* fall through */ }
         }
 
-        // Strategy 2: Open-Meteo multi-model (free, no key) — fallback
+        // Strategy 2: Open-Meteo multi-model
         const [defaultRes, ukmoRes] = await Promise.all([
           fetch(
             `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code,rain,showers,precipitation&timezone=auto`,
@@ -344,19 +411,12 @@ export function FeedInfoCards() {
           let code = defaultCur.weather_code || 0;
           const rain = defaultCur.rain ?? 0;
           const showers = defaultCur.showers ?? 0;
-
-          // Cross-reference UKMO model — if it detects rain/storm, override
           const ukmoCode = ukmoCur?.weather_code ?? 0;
           const ukmoRain = (ukmoCur?.rain ?? 0) + (ukmoCur?.showers ?? 0) + (ukmoCur?.precipitation ?? 0);
-          if (ukmoCode >= 50 && code < 50) {
-            code = ukmoCode;
-          }
-
-          // Correct WMO code if rain/showers fields disagree
+          if (ukmoCode >= 50 && code < 50) code = ukmoCode;
           if ((rain > 0 || showers > 0 || ukmoRain > 0) && code < 50) {
             code = showers > 0 ? 80 : 61;
           }
-
           setWeather({ temp, condition: interpretWeatherCode(code), city: cityName, wmoCode: code });
         } else {
           setWeather({ temp: 31, condition: 'Partly Cloudy', city: cityName, wmoCode: 2 });
@@ -377,7 +437,6 @@ export function FeedInfoCards() {
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
     );
 
-    // Refresh weather every 10 minutes so conditions update when rain stops/starts
     const refreshInterval = setInterval(() => {
       if (lastLat !== 0) updateWeather(lastLat, lastLon, true);
     }, 10 * 60_000);
@@ -390,155 +449,180 @@ export function FeedInfoCards() {
 
   // Fetch exchange rates
   useEffect(() => {
-    const fetchRates = async () => {
-      try {
-        const res = await fetch('https://open.er-api.com/v6/latest/NGN');
-        if (res.ok) {
-          const data = await res.json();
-          const r = data.rates || {};
-          const currencies = [
-            { currency: 'USD', symbol: '$' },
-            { currency: 'GBP', symbol: '£' },
-            { currency: 'EUR', symbol: '€' },
-            { currency: 'JPY', symbol: '¥' },
-            { currency: 'CNY', symbol: '¥' },
-          ];
-          setRates(
-            currencies.map((c) => ({
-              ...c,
-              // r[c.currency] = how many of that currency per 1 NGN, invert for "1 currency = X NGN"
-              rate: r[c.currency] ? Math.round(1 / r[c.currency]) : 0,
-            })),
-          );
-        } else {
-          setFallbackRates();
-        }
-      } catch {
-        setFallbackRates();
-      } finally {
-        setRatesLoading(false);
-      }
-    };
+    const currencies = [
+      { currency: 'USD', symbol: '$' },
+      { currency: 'GBP', symbol: '£' },
+      { currency: 'EUR', symbol: '€' },
+      { currency: 'JPY', symbol: '¥' },
+      { currency: 'CNY', symbol: '¥' },
+    ];
 
-    const setFallbackRates = () => {
+    const setFallback = () => {
       setRates([
-        { currency: 'USD', symbol: '$', rate: 1580 },
-        { currency: 'GBP', symbol: '£', rate: 2010 },
-        { currency: 'EUR', symbol: '€', rate: 1720 },
-        { currency: 'JPY', symbol: '¥', rate: 11 },
-        { currency: 'CNY', symbol: '¥', rate: 218 },
+        { currency: 'USD', symbol: '$', rate: 1352.24 },
+        { currency: 'GBP', symbol: '£', rate: 1834.16 },
+        { currency: 'EUR', symbol: '€', rate: 1594.37 },
+        { currency: 'JPY', symbol: '¥', rate: 8.47 },
+        { currency: 'CNY', symbol: '¥', rate: 197.53 },
       ]);
     };
 
+    const fetchRates = async () => {
+      const sources = [
+        `https://api.exchangerate-api.com/v4/latest/USD?t=${Date.now()}`,
+        `https://open.er-api.com/v6/latest/USD?t=${Date.now()}`,
+        `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.min.json`,
+      ];
+
+      for (const url of sources) {
+        try {
+          const res = await fetch(url, { cache: 'no-store' });
+          if (!res.ok) continue;
+          const data = await res.json();
+          const r: Record<string, number> = data.rates ?? data.usd ?? {};
+          const ngnPerUSD = r['NGN'] ?? r['ngn'] ?? 0;
+          if (!ngnPerUSD) continue;
+
+          const parsed = currencies.map((c) => {
+            const key = c.currency.toUpperCase();
+            const keyLower = c.currency.toLowerCase();
+            const foreignPerUSD = r[key] ?? r[keyLower] ?? 0;
+            const rate = foreignPerUSD ? Math.round((ngnPerUSD / foreignPerUSD) * 100) / 100 : 0;
+            return { ...c, rate };
+          });
+
+          if (parsed.some((p) => p.rate > 0)) {
+            setRates(parsed);
+            setRatesLoading(false);
+            return;
+          }
+        } catch { /* try next */ }
+      }
+      setFallback();
+      setRatesLoading(false);
+    };
+
     fetchRates();
+    const interval = setInterval(fetchRates, 30 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Cycle through exchange rates
+  // Cycle exchange rates
   useEffect(() => {
     if (rates.length === 0) return;
-    const interval = setInterval(() => {
-      setRateIndex((prev) => (prev + 1) % rates.length);
-    }, 3000);
+    const interval = setInterval(() => setRateIndex((prev) => (prev + 1) % rates.length), 3000);
     return () => clearInterval(interval);
   }, [rates]);
 
+  // Fetch news
+  useEffect(() => {
+    const fetchNews = async () => {
+      const results = await Promise.allSettled(
+        NEWS_FEEDS.map((feed) => fetchFeedWithFallback(feed.url, feed.source)),
+      );
+      const arrays = results.map((r) => (r.status === 'fulfilled' ? r.value : []));
+      const total = arrays.reduce((s, a) => s + a.length, 0);
+
+      if (total > 0) {
+        const max = Math.max(...arrays.map((a) => a.length));
+        const interleaved: NewsItem[] = [];
+        for (let i = 0; i < max; i++) {
+          arrays.forEach((a) => { if (a[i]) interleaved.push(a[i]); });
+        }
+        setNewsItems(interleaved.slice(0, 8));
+      } else {
+        setNewsItems(FALLBACK_NEWS);
+      }
+    };
+    fetchNews();
+    const interval = setInterval(fetchNews, 15 * 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Cycle news
+  useEffect(() => {
+    if (newsItems.length <= 1) return;
+    const interval = setInterval(() => setNewsIndex((prev) => (prev + 1) % newsItems.length), 6000);
+    return () => clearInterval(interval);
+  }, [newsItems]);
+
   const currentRate = rates[rateIndex];
+  const currentNews = newsItems[newsIndex];
 
   return (
-    <div className="flex gap-2.5">
-      {/* Weather Card — Ambient Sky Scene */}
-      <div
-        className="relative flex-1 rounded-2xl overflow-hidden min-h-[100px] transition-all duration-[2000ms]"
-        style={{ background: theme.skyGradient }}
-      >
-        {/* Horizon glow */}
-        <div className="absolute inset-0 pointer-events-none transition-all duration-[2000ms]" style={{ background: theme.horizonGlow }} />
+    <div
+      className="relative rounded-2xl overflow-hidden transition-all duration-[2000ms]"
+      style={{ background: theme.skyGradient, minHeight: 180 }}
+    >
+      {/* Horizon glow */}
+      <div className="absolute inset-0 pointer-events-none transition-all duration-[2000ms]" style={{ background: theme.horizonGlow }} />
 
-        {/* Stars */}
-        {theme.showStars && <MiniStars />}
+      {/* Stars */}
+      {theme.showStars && <SidebarStars />}
 
-        {/* Sun or Moon */}
-        <MiniCelestial theme={theme} />
+      {/* Celestial body */}
+      <SidebarCelestial theme={theme} />
 
-        {/* Rain */}
-        {theme.showRain && <MiniRainDrops isDark={isDark} />}
+      {/* Clouds */}
+      {theme.showClouds && <SidebarClouds color={theme.cloudColor} />}
 
-        {/* City silhouette */}
-        <MiniSilhouette color={theme.silhouetteColor} />
+      {/* Rain */}
+      {theme.showRain && <SidebarRainDrops isDark={isDark} />}
 
-        {/* Content overlay */}
-        <div className="relative z-10 p-3 flex flex-col justify-between h-full min-h-[100px]">
-          {weatherLoading ? (
-            <div className="animate-pulse flex flex-col gap-2 flex-1 justify-center">
-              <div className="h-4 rounded-full w-16 bg-white/10" />
-              <div className="h-6 rounded-full w-12 bg-white/10" />
-              <div className="h-3 rounded-full w-20 bg-white/10" />
-            </div>
-          ) : weather ? (
-            <>
-              <span
-                className="text-[10px] font-medium uppercase tracking-wider"
-                style={{ color: theme.mutedColor, textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}
-              >
-                Weather
-              </span>
-              <div>
-                <p
-                  className="text-2xl font-bold leading-none"
-                  style={{ color: theme.textColor, textShadow: '0 1px 6px rgba(0,0,0,0.4)' }}
-                >
-                  {weather.temp}°
-                </p>
-                <p
-                  className="text-[11px] mt-0.5 truncate"
-                  style={{ color: theme.mutedColor, textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}
-                >
-                  {weather.condition} · {weather.city}
-                </p>
-              </div>
-            </>
-          ) : null}
-        </div>
-      </div>
+      {/* City silhouette */}
+      <SidebarSilhouette color={theme.silhouetteColor} />
 
-      {/* Exchange Rate Card */}
-      <div className="relative flex-1 rounded-2xl mod-card p-3 flex flex-col justify-between min-h-[88px] overflow-hidden">
-        {/* Accent line */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent opacity-60" />
-        {ratesLoading ? (
+      {/* Content overlay */}
+      <div className="relative z-10 p-4 flex flex-col justify-between" style={{ minHeight: 180 }}>
+        {weatherLoading ? (
           <div className="animate-pulse flex flex-col gap-2 flex-1 justify-center">
-            <div className="h-4 rounded-full w-16 bg-white/[0.06]" />
-            <div className="h-6 rounded-full w-20 bg-white/[0.06]" />
-            <div className="h-3 rounded-full w-14 bg-white/[0.06]" />
+            <div className="h-3 rounded-full w-16 bg-white/15" />
+            <div className="h-8 rounded-full w-14 bg-white/15" />
+            <div className="h-3 rounded-full w-28 bg-white/15" />
           </div>
-        ) : currentRate ? (
+        ) : weather ? (
           <>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--neu-text-muted)' }}>
-                ₦ Rates
-              </span>
-              <span className="material-symbols-outlined text-xl text-primary">
-                currency_exchange
-              </span>
-            </div>
-            <div>
-              <p className="text-xl font-bold leading-none" style={{ color: 'var(--neu-text)' }}>
-                {currentRate.symbol}1 = ₦{currentRate.rate.toLocaleString()}
+            {/* Exchange rate */}
+            {!ratesLoading && currentRate && (
+              <p
+                className="text-xs font-bold mt-3"
+                style={{ color: theme.textColor, textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}
+              >
+                1 {currentRate.currency} = ₦{currentRate.rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
-              <div className="flex items-center gap-1 mt-1">
-                {rates.map((r, i) => (
-                  <span
-                    key={r.currency}
-                    className={`text-[9px] font-bold px-1 py-0.5 rounded transition-all ${
-                      i === rateIndex ? 'text-primary' : ''
-                    }`}
-                    style={{ color: i === rateIndex ? undefined : 'var(--neu-text-muted)' }}
-                  >
-                    {r.currency}
-                  </span>
-                ))}
+            )}
+
+            {/* News ticker */}
+            {currentNews && (
+              <div className="mt-2 flex items-start gap-1.5">
+                <span
+                  className="shrink-0 text-[8px] font-black px-1 py-0.5 rounded"
+                  style={{
+                    background: 'rgba(239,68,68,0.85)',
+                    color: '#fff',
+                    lineHeight: 1.2,
+                  }}
+                >
+                  LIVE
+                </span>
+                <span
+                  className="shrink-0 text-[8px] font-black px-1 py-0.5 rounded"
+                  style={{
+                    background: 'rgba(0,0,0,0.3)',
+                    color: '#fff',
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {currentNews.source}
+                </span>
+                <p
+                  className="text-[10px] leading-tight line-clamp-2"
+                  style={{ color: theme.mutedColor, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
+                >
+                  {currentNews.title}
+                </p>
               </div>
-            </div>
+            )}
           </>
         ) : null}
       </div>
